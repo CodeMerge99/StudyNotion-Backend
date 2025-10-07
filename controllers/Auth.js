@@ -2,6 +2,9 @@ const User = require("../models/User");
 const OTP =  require("../models/OTP");
 const otpGenertor = require("otp-generator");
 const bcrypt = require("bcrypt");
+const jwt  = require("jsonwebtoken");
+
+require("dotenv").config();
 
 
 //sendOTP controller//
@@ -131,4 +134,68 @@ exports.signUp = async(req,res)=>{
             message:"User cannot be registred, Please try again later",
          })
       }
+}
+
+
+//login controller//
+exports.login = async(req,res)=>{
+    try {
+        //fecth data from req body//
+        const {email,password} = req.body;
+        if(!email || !password){
+            return res.status(403).json({
+                success:false,
+                message:" Some feilds are missing,Please fill alll the required feilds",
+            })
+        }
+        //check if exisiting user or not //
+        const user = await User.findOne({email}).populate("additionalDetails");
+        if(!user){
+            return res.status(401).json({
+                success:false,
+                message:"User is not registered, Please Sign Up"
+            })
+        }
+        if(bcrypt.compare(password,user.password)){
+            const payload ={
+                email:user.email,
+                id:user._id,
+                role:user.role,
+            }
+           const token = jwt.sign(payload,process.env.JWT_SECRET,{
+            expiresIn:"2h",
+           });
+           user.token = token;
+           user.password = undefined;
+           //create a cookie and send token inside cookie//
+           const options  = {
+                 expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+                 httpOnly:true,
+           }
+           res.cookie("token",token,options).status(200).json({
+             success:true,
+             token,
+             user,
+             message:"Logged In Successfully 😀",
+           })
+        }
+        else{
+            return res.status(401).json({
+                success:false,
+                message:"Password is Incorrect 😔",
+            });
+        }
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success:false,
+            message:"Login Failed, Please try again Later 😥!!"
+        })
+    }
+}
+
+
+//change password controller//
+exports.changePassword = async(req,res) => {
+       
 }
